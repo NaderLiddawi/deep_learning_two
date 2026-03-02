@@ -45,7 +45,7 @@ def train(
 
     # create loss function and optimizer
     loss_func = ClassificationLoss()
-    # optimizer = ...
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
 
     global_step = 0
     metrics = {"train_acc": [], "val_acc": []}
@@ -61,8 +61,22 @@ def train(
         for img, label in train_data:
             img, label = img.to(device), label.to(device)
 
-            # TODO: implement training step
-            raise NotImplementedError("Training step not implemented")
+            # Forward pass
+            logits = model(img)
+            loss = loss_func(logits, label)
+
+            # Backward pass
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+            # Log train loss at every iteration
+            logger.add_scalar("train_loss", loss.item(), global_step=global_step)
+
+            # Accumulate per-batch accuracy: fraction of correct predictions
+            preds = logits.argmax(dim=1)
+            batch_acc = (preds == label).float().mean().item()
+            metrics["train_acc"].append(batch_acc)
 
             global_step += 1
 
@@ -73,14 +87,21 @@ def train(
             for img, label in val_data:
                 img, label = img.to(device), label.to(device)
 
-                # TODO: compute validation accuracy
-                raise NotImplementedError("Validation accuracy not implemented")
+                # Forward pass — no grad needed
+                logits = model(img)
+                preds = logits.argmax(dim=1)
+
+                # Accumulate per-batch validation accuracy
+                batch_acc = (preds == label).float().mean().item()
+                metrics["val_acc"].append(batch_acc)
 
         # log average train and val accuracy to tensorboard
         epoch_train_acc = torch.as_tensor(metrics["train_acc"]).mean()
         epoch_val_acc = torch.as_tensor(metrics["val_acc"]).mean()
 
-        raise NotImplementedError("Logging not implemented")
+        # Log epoch-level accuracies aligned to the same global_step
+        logger.add_scalar("train_accuracy", epoch_train_acc.item(), global_step=global_step)
+        logger.add_scalar("val_accuracy", epoch_val_acc.item(), global_step=global_step)
 
         # print on first, last, every 10th epoch
         if epoch == 0 or epoch == num_epoch - 1 or (epoch + 1) % 10 == 0:
